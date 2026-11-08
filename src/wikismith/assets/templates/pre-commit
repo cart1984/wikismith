@@ -1,0 +1,14 @@
+#!/bin/sh
+# Installed by `wikismith hook`: shrink or ask about large files, and refuse commits that contain secrets.
+# Bypass once with `git commit --no-verify`.
+# core.hooksPath replaces the repository's own hooks folder, so its pre-commit hook runs from here, if it has one.
+own="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+if [ -x "$own" ]; then
+    "$own" "$@" || exit 1
+fi
+if ! command -v wikismith >/dev/null 2>&1; then
+    echo "pre-commit: wikismith is not installed, so the secret scan can't run." >&2
+    echo "Install it (uv tool install wikismith) or bypass once with: git commit --no-verify" >&2
+    exit 1
+fi
+exec wikismith pre-commit

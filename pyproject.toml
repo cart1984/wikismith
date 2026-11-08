@@ -1,0 +1,50 @@
+[project]
+name = "wikismith"
+version = "0.1.0"
+description = "Forge a wiki from raw notes, and serve it to AI agents over MCP (mcpedia)."
+readme = "README.md"
+authors = [{ name = "cart1984" }]
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "fastembed>=0.9.1",
+    "mcp>=2.3.0",
+    "numpy>=2.5.4",
+    "pillow>=11.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.optional-dependencies]
+heic = ["pillow-heif>=0.20"]  # shrinking iPhone photos (HEIC) on commit; other formats need nothing extra
+
+[project.scripts]
+wikismith = "wikismith.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pillow-heif>=0.20",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

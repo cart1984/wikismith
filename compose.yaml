@@ -1,0 +1,61 @@
+# mcpedia in a container. Use this file as it is: your settings go into `.env` next to it, and changes of your own
+# into a `compose.override.yaml`, which Compose merges in. The README's "Setup", steps 2b to 4, walks through it:
+#
+#   echo "WIKISMITH_VAULT_DIR=/path/to/your/vault" > .env
+#   echo "WIKISMITH_TOKEN=$(openssl rand -hex 32)" >> .env
+#   echo "WIKISMITH_BIND=<this machine's address on your clients' network>" >> .env
+#   echo "GIT_NAME=Your Name" >> .env && echo "GIT_EMAIL=you@example.com" >> .env
+#   claude setup-token                        # on any machine: a long-lived token for your Claude plan
+#   echo "CLAUDE_CODE_OAUTH_TOKEN=<that token>" >> .env
+#   chmod 600 .env
+#   docker compose build
+#   docker compose run --rm mcpedia init /vault --name <name> --no-hook   # once, if the vault is new to wikismith
+#   docker compose up -d
+#
+# Clients connect to http://<WIKISMITH_BIND>:8765/mcp with "Authorization: Bearer <token>".
+# WIKISMITH_BIND is this machine's own address on the network your clients use, not the clients' addresses. Clients
+# coming in over a VPN use whichever address the VPN routes them to. For use on this machine only, 127.0.0.1 (an IP:
+# `localhost` may mean ::1). Binding limits the network, not the devices on it: restrict those with a firewall if
+# needed, and keep the token secret.
+# Forge and audit jobs run inside the container with the Claude Code CLI; without
+# CLAUDE_CODE_OAUTH_TOKEN everything else works and jobs fail with a clear message.
+services:
+  mcpedia:
+    build: .
+    image: wikismith:latest
+    restart: unless-stopped
+    environment:
+      WIKISMITH_TOKEN: ${WIKISMITH_TOKEN:?set WIKISMITH_TOKEN in .env}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      # Who the container's commits are by: it doesn't see your git config.
+      GIT_AUTHOR_NAME: ${GIT_NAME:-mcpedia}
+      GIT_AUTHOR_EMAIL: ${GIT_EMAIL:-mcpedia@localhost}
+      GIT_COMMITTER_NAME: ${GIT_NAME:-mcpedia}
+      GIT_COMMITTER_EMAIL: ${GIT_EMAIL:-mcpedia@localhost}
+      WIKISMITH_PORT: ${WIKISMITH_PORT:-8765}
+      # The time zone for captures and jobs, unless wikismith.yaml sets `timezone` (default: UTC).
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      # Required: publish on one address only, never on every interface (which can include a public one).
+      - "${WIKISMITH_BIND:?set WIKISMITH_BIND in .env to this machine's address on your clients' network}:${WIKISMITH_PORT:-8765}:${WIKISMITH_PORT:-8765}"
+    volumes:
+      # The vault's git clone. Writable: captures are written and committed here.
+      - ${WIKISMITH_VAULT_DIR:?set WIKISMITH_VAULT_DIR in .env to the vault's folder on this machine}:/vault
+      # Each vault's embeddings and jobs. The model is in the image (/models): to change it, set search.model in
+      # wikismith.yaml and build with the same name: `docker compose build --build-arg WIKISMITH_MODEL=<model>`.
+      - mcpedia-cache:/cache
+      # SSH key for pushing to the vault's remote, read-only (gitignored).
+      - ./ssh:/home/mcpedia/.ssh:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      # Claude Code keeps session state in the home folder; nothing there needs to survive.
+      - /home/mcpedia:uid=1000,gid=1000,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 2g
+
+volumes:
+  mcpedia-cache:

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.DS_Store
+
+# Your own Docker setup (see the README, step 2b)
+.env
+ssh/
+compose.override.yaml

@@ -1,0 +1,48 @@
+name: {name}
+# description: One line about what this vault holds; shown to agents.
+# timezone: Europe/Berlin   # for dates in the vault (captures, forges); default: this machine's
+
+# Every setting below shows its default. Uncomment to change.
+
+# files:                    # checked by the pre-commit hook when you commit
+#   image_max_px: 1600      # images are shrunk to this long edge ...
+#   image_max_kb: 500       # ... and this size; BMP, TIFF and HEIC are always converted
+#   images: shrink          # shrink | ask (ask works in a terminal; elsewhere the commit is refused)
+#   max_kb: 1024            # other files (PDFs, videos) over this: you're asked whether to keep them
+
+# access:
+#   read: [wiki, archive]   # folders agents may read; search skips the archive unless asked
+#   search_captures: true   # unforged captures are searchable (labelled as such)
+
+# secrets:
+#   policy: redact          # allow | warn | redact | block, applied to new captures
+#   pii: redact             # allow | warn | redact | block: the same for personal data (patterns with pii: true)
+#   mask_reads: true        # mask secrets in everything agents read
+#   allow_cloud_remote: false
+#   patterns:               # your own secret patterns, on top of the built-in ones
+#     - id: my-hostname
+#       regex: '\bmyhome-[a-z0-9]+\.example\.org\b'
+#       description: Home hostname
+#     - id: parcel-id       # personal data, e.g. a property's ID in public records (a made-up format)
+#       regex: '\bPCL-\d{4}-\d{6}\b'
+#       description: Parcel ID
+#       pii: true
+
+# git:                      # needed for captures, forges and audits; without git, mcpedia is read-only
+#   commit_captures: true   # false: mcpedia saves captures, you commit them yourself
+#   sync: true              # pull before and push after each commit and merge, if there's a remote
+#   remote: origin
+#   branch: main
+
+# search:
+#   semantic: true
+#   model: BAAI/bge-small-en-v1.5
+
+# review:
+#   auto_merge: additive    # none | additive: merge forges that only add things
+#   flag: ["wiki/*/my-*.md"] # pages that always wait for the owner's OK
+
+# jobs:                    # how mcpedia runs forge and audit jobs: any headless agent CLI, Claude Code by default
+#   agent: [claude, -p, --permission-mode, acceptEdits, --allowedTools, "Bash(git *),Bash(wikismith *),Read,Write,Edit,Glob,Grep"]
+#   timeout_minutes: 30
+#   notify: [curl, -s, -d, "{message}", "https://ntfy.sh/<your-topic>"]   # when something waits; counts only

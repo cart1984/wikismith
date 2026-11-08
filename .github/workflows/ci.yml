@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run pyright
+      - run: uv run pytest
+
+  # Builds the image to prove it works, and never pushes it: the default image contains Claude Code, which isn't
+  # ours to redistribute. People build their own from the Dockerfile.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t wikismith:ci .
+      - run: docker run --rm wikismith:ci --version
+      - name: Health check against a fresh vault
+        run: |
+          mkdir vault && chmod 777 vault  # the container runs as uid 1000
+          docker run --rm -v "$PWD/vault:/vault" --entrypoint wikismith wikismith:ci init /vault --git --no-hook
+          docker run -d --name mcpedia -e WIKISMITH_TOKEN=$(openssl rand -hex 32) -v "$PWD/vault:/vault" -p 127.0.0.1:8765:8765 wikismith:ci
+          for i in $(seq 30); do curl -sf http://127.0.0.1:8765/healthz && break; sleep 2; done
+          curl -sf http://127.0.0.1:8765/healthz | grep -q '"status": "ok"'
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
