@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -15,9 +16,15 @@ from wikismith.pages import Catalog, Page
 from wikismith.secretscan import Scanner
 from wikismith.vault import Vault
 
-CheckName = Literal["links", "orphans", "frontmatter", "index", "unforged", "secrets", "large"]
-CHECKS: tuple[CheckName, ...] = get_args(CheckName)
+CheckName = Literal["links", "orphans", "frontmatter", "index", "names", "unforged", "secrets", "large", "similar"]
+ALL_CHECKS: tuple[CheckName, ...] = get_args(CheckName)
+# What `wikismith check` runs by default. `similar` only guesses, so it runs when asked for: a guess mustn't fail the
+# check, hold a merge or make a forge rewrite pages that only look alike.
+CHECKS: tuple[CheckName, ...] = tuple(c for c in ALL_CHECKS if c != "similar")
 REQUIRED_KEYS = ("title", "area", "tags", "updated", "sources")
+SHINGLE = 8  # words per run compared by the `similar` check
+SIMILAR_SHARE = 0.2  # report a pair when this share of the smaller page's runs also appears in the other
+SIMILAR_MIN_RUNS = 5  # ...and they share at least this many runs, so two short stubs don't match on boilerplate
 LONG_LINE = 2000  # characters; agents' file readers may cut lines longer than this
 MAX_TEXT_BYTES = 10 * 1024 * 1024  # larger raw files are reported by size only
 
@@ -40,9 +47,11 @@ class Checker:
             "orphans": self.orphans,
             "frontmatter": self.frontmatter,
             "index": self.index,
+            "names": self.names,
             "unforged": self.unforged,
             "secrets": self.secrets,
             "large": self.large,
+            "similar": self.similar,
         }
         return {name: runners[name](catalog) for name in names}
 
@@ -123,6 +132,20 @@ class Checker:
             ]
         return issues
 
+    def names(self, catalog: Catalog) -> list[Issue]:
+        """Page names used more than once across the wiki and archive: `[[name]]` and `read_page("name")` can't tell
+        such pages apart."""
+        by_name: dict[str, list[str]] = {}
+        for page in self._content_pages(catalog, ("wiki", "archive")):
+            if not page.is_index:
+                by_name.setdefault(page.name.lower(), []).append(page.path)
+        issues = []
+        for paths in by_name.values():
+            for path in paths if len(paths) > 1 else []:
+                others = ", ".join(p for p in paths if p != path)
+                issues.append(Issue(path, f"same page name as {others}: rename one, e.g. with its area as a prefix"))
+        return issues
+
     def unforged(self, catalog: Catalog) -> list[Issue]:
         """Raw files not forged yet, with their size, so a forge can plan to read long ones in chunks."""
         return [
@@ -158,6 +181,28 @@ class Checker:
                 issues.append(Issue(rel, f"{kb} KB, over the {limits.max_kb} KB limit"))
         return issues
 
+    def similar(self, catalog: Catalog) -> list[Issue]:
+        """Pairs of wiki pages that share much of their text (runs of the same words): possible duplicates, for an
+        agent or the owner to judge. Reported on the smaller page of each pair."""
+        pages = [p for p in self._content_pages(catalog) if not p.is_index]
+        runs = {p.path: _runs(p) for p in pages}
+        holders: dict[int, list[str]] = {}
+        for path, own in runs.items():
+            for run in own:
+                holders.setdefault(run, []).append(path)
+        shared: dict[tuple[str, str], int] = {}
+        for paths in holders.values():
+            for i, a in enumerate(paths):
+                for b in paths[i + 1 :]:
+                    shared[(a, b)] = shared.get((a, b), 0) + 1
+        issues = []
+        for (a, b), n in sorted(shared.items()):
+            small, other = (a, b) if len(runs[a]) <= len(runs[b]) else (b, a)
+            share = n / len(runs[small])
+            if n >= SIMILAR_MIN_RUNS and share >= SIMILAR_SHARE:
+                issues.append(Issue(small, f"{share:.0%} of its text also appears in {other}: the same topic?"))
+        return sorted(issues, key=lambda i: (i.path, i.message))
+
     def _files(self) -> list[str]:
         """The vault's files: the ones git tracks, or every file without git."""
         try:
@@ -183,6 +228,17 @@ def format_report(results: dict[CheckName, list[Issue]], limit: int = 50) -> str
         if len(issues) > limit:
             lines.append(f"- ... and {len(issues) - limit} more")
     return "\n".join(lines)
+
+
+_CITATION = re.compile(r"\(source:[^)]*\)")
+_WORD = re.compile(r"\w+")
+
+
+def _runs(page: Page) -> set[int]:
+    """Hashes of the page's runs of `SHINGLE` consecutive words, without frontmatter and source citations (two pages
+    citing the same raw file aren't alike for that)."""
+    words = _WORD.findall(_CITATION.sub(" ", page.doc.frontmatter.body).lower())
+    return {hash(tuple(words[i : i + SHINGLE])) for i in range(len(words) - SHINGLE + 1)}
 
 
 def _size_note(path: Path) -> str:

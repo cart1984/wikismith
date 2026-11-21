@@ -337,7 +337,7 @@ class JobRunner:
     def _issues(self, tree: Path) -> CheckIssues:
         """The worktree's check issues, to tell whether the agent's link changes fixed anything."""
         checker = Checker(Vault(tree, self.vault.config), Scanner.for_config(self.vault.config.secrets))
-        results = checker.run(("links", "orphans", "frontmatter", "index"))
+        results = checker.run(("links", "orphans", "frontmatter", "index", "names"))
         return frozenset((issue.path, issue.message) for issues in results.values() for issue in issues)
 
     def _finish(self, job: Job, before: CheckIssues, after: CheckIssues) -> None:

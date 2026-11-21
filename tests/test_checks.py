@@ -4,7 +4,7 @@ import pytest
 from mcp.client import Client
 
 from conftest import git, make_vault, write_files
-from wikismith.checks import CHECKS, Checker, format_report
+from wikismith.checks import ALL_CHECKS, CHECKS, Checker, format_report
 from wikismith.secretscan import Scanner
 from wikismith.server import build_server
 from wikismith.vault import Vault
@@ -67,6 +67,53 @@ def test_index(vault: Vault) -> None:
         ("wiki/garage", "area has no _index.md"),
         ("wiki/kitchen/knife-care.md", "not listed in wiki/kitchen/_index.md"),
     ]
+
+
+def test_names(vault: Vault) -> None:
+    assert issues(vault, "names") == []
+    write_files(
+        vault.root,
+        {
+            "wiki/garden/Decisions.md": "# Decisions\n",
+            "archive/kitchen/decisions.md": "# Decisions\n",
+            "wiki/garden/_index.md": "# Garden\n",  # every area has one: not a clash
+        },
+    )
+    assert issues(vault, "names") == [
+        (
+            "wiki/garden/Decisions.md",
+            "same page name as archive/kitchen/decisions.md: rename one, e.g. with its area as a prefix",
+        ),
+        (
+            "archive/kitchen/decisions.md",
+            "same page name as wiki/garden/Decisions.md: rename one, e.g. with its area as a prefix",
+        ),
+    ]
+
+
+SHARED = "The south bed gets drip irrigation on a timer at six every morning from May to September. "
+
+
+def test_similar(vault: Vault) -> None:
+    fm = "---\ntitle: T\narea: garden\ntags: []\nupdated: 2026-01-01\nsources: []\n---\n"
+    cite = "(source: raw/notes/2026-01-05_long-import-file-name.md) " * 3  # citations don't count as shared text
+    write_files(
+        vault.root,
+        {
+            "wiki/garden/watering.md": fm + "# Watering\n\n" + SHARED + "Mulch keeps the soil moist.\n",
+            "wiki/garden/digest-march.md": fm + "# March digest\n\n" + SHARED + "Ordered seed potatoes.\n" * 2,
+            "wiki/garden/compost.md": fm + "# Compost\n\nTurn the pile every two weeks in summer. " + cite,
+            "wiki/garden/leaves.md": fm + "# Leaves\n\nShred the leaves before adding them to the bin. " + cite,
+        },
+    )
+    assert issues(vault, "similar") == [
+        ("wiki/garden/watering.md", "62% of its text also appears in wiki/garden/digest-march.md: the same topic?")
+    ]
+
+
+def test_similar_only_runs_when_asked(vault: Vault) -> None:
+    assert "similar" not in Checker(vault, Scanner()).run()
+    assert "similar" in ALL_CHECKS and "similar" not in CHECKS
 
 
 def test_unforged(vault: Vault) -> None:

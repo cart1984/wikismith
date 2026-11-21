@@ -158,8 +158,9 @@ def build_server(vault: Vault, embedder: Embedder | None = None, warm: bool = Tr
     @server.tool(annotations=READ_ONLY)
     def check_vault(checks: list[CheckName] | None = None) -> str:
         """Mechanical checks: broken links and links into the archive, orphan pages, frontmatter problems, pages
-        missing from their area index, unforged raw files, secrets in the wiki (values never shown), and files over the
-        vault's size limits. Runs all checks unless `checks` names some."""
+        missing from their area index, page names used twice, unforged raw files, secrets in the wiki (values never
+        shown), and files over the vault's size limits. Runs all of these unless `checks` names some. `similar` (only
+        when named) lists pairs of pages that share much of their text: possible duplicates to judge."""
         return format_report(checker.run(tuple(checks) if checks else CHECKS))
 
     @server.tool(annotations=CAPTURE)

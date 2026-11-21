@@ -14,7 +14,7 @@ Run `wikismith check --limit 200` and keep its output for the report.
 
 Read each area's `_index.md` and skim its pages. Look for:
 
-- **Duplicates**: two pages on the same topic that should be merged, including pages built from one source or batch (a digest page) whose sections belong on existing topic pages, and cross-cutting pages (timelines, decision logs) that copy detail from topic pages instead of linking to them.
+- **Duplicates**: two pages on the same topic that should be merged (`wikismith check --check similar` lists pairs that share much of their text; judge each, since a shared quote doesn't make a duplicate), including pages built from one source or batch (a digest page) whose sections belong on existing topic pages, and cross-cutting pages (timelines, decision logs) that copy detail from topic pages instead of linking to them.
 - **Misfiled pages**: a page that belongs in another area.
 - **Outdated pages**: finished events, replaced devices, superseded plans; candidates for `archive/`.
 - **Archive pages to delete**: archived pages nothing is worth looking up in any more (superseded by a wiki page, unlinked, no history the owner would ask about). Deletions only ever happen with the owner's OK; git history keeps them.

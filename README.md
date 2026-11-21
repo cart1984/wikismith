@@ -497,7 +497,7 @@ Each model gets the query and passage prefixes it expects. Changing the model re
 | `wikismith init [path]` | Create a vault, or add what's missing. `--name`, `--git`/`--no-git`, `--hook`/`--no-hook` |
 | `wikismith serve` | Run mcpedia. `--transport stdio` (default) or `http`, `--host`, `--port`, `--no-auth` (loopback only) |
 | `wikismith run forge\|audit` | Run a job in the foreground, e.g. from cron |
-| `wikismith check` | The mechanical checks: `links`, `orphans`, `frontmatter`, `index`, `unforged`, `secrets`. `--check <name>`, `--limit`; exit 1 on issues |
+| `wikismith check` | The mechanical checks: `links`, `orphans`, `frontmatter`, `index`, `names` (a page name used twice), `unforged`, `secrets`, `large`. `--check similar` (only when asked for) lists pairs of pages that share much of their text, possible duplicates. `--check <name>`, `--limit`; exit 1 on issues |
 | `wikismith search <query>` | Search from the terminal. `--top-k`, `--area` |
 | `wikismith hook` | Enable the pre-commit hook for this vault; `--remove` disables it |
 | `wikismith pre-commit` | What the hook runs: large files, then the secret scan |

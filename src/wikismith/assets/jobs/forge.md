@@ -36,7 +36,8 @@ Classify every change as you go, for the summary:
 
 ## 3. Check and commit
 
-1. Run `wikismith check`. Fix every issue your changes introduced (broken links, missing frontmatter, pages missing from an index). Don't fix unrelated older issues; mention them in one line instead.
+1. Run `wikismith check`. Fix every issue your changes introduced (broken links, missing frontmatter, pages missing from an index, a page name already used elsewhere). Don't fix unrelated older issues; mention them in one line instead.
+   Then run `wikismith check --check similar`. It only guesses: for each pair with a page you created, decide whether it's the same topic as the other page, and if so, put your text on the existing page instead. Leave pairs that aren't duplicates, and older pairs, alone.
 2. Stage your changes and run `wikismith scan --staged`; if it finds anything, remove it before committing.
 3. Commit on your branch: `Forge <n> raw file(s): <areas>`.
 
