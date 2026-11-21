@@ -14,11 +14,11 @@ Run `wikismith check --limit 200` and keep its output for the report.
 
 Read each area's `_index.md` and skim its pages. Look for:
 
-- **Duplicates**: two pages on the same topic that should be merged.
+- **Duplicates**: two pages on the same topic that should be merged, including pages built from one source or batch (a digest page) whose sections belong on existing topic pages, and cross-cutting pages (timelines, decision logs) that copy detail from topic pages instead of linking to them.
 - **Misfiled pages**: a page that belongs in another area.
 - **Outdated pages**: finished events, replaced devices, superseded plans; candidates for `archive/`.
 - **Archive pages to delete**: archived pages nothing is worth looking up in any more (superseded by a wiki page, unlinked, no history the owner would ask about). Deletions only ever happen with the owner's OK; git history keeps them.
-- **Contradictions**: two pages (or one page and its sources) that disagree without noting the conflict.
+- **Contradictions**: two pages (or one page and its sources) that disagree without noting the conflict, and pages that keep a superseded fact next to a "Correction" or "Update" line instead of rewriting it.
 - **Unclear status**: purchases or decisions stated as facts without a source that says so.
 - **Thin or overgrown pages**: a page that's only a stub, or so long it covers several topics.
 - **Personal data**: other people's full names with addresses, phone numbers, emails or ID numbers, where the PII policy isn't `allow`. Name the page and the kind of data, never the data itself.

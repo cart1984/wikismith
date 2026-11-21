@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import pytest
 from conftest import make_vault, write_files
 from wikismith.pages import Catalog, Page
 from wikismith.reader import Reader
-from wikismith.search import BM25, SearchIndex, chunk_page, tokenize
+from wikismith.search import BM25, SHARED_EMBEDDINGS_ENV, SearchIndex, chunk_page, tokenize
 from wikismith.vault import Vault
 
 SYNONYMS = {"irrigation": "watering", "hydrate": "watering", "loaf": "bread"}
@@ -138,6 +139,23 @@ def test_refresh_is_incremental_and_cached(vault: Vault) -> None:
     again = FakeEmbedder()
     SearchIndex(vault, again).search("tomatoes")
     assert again.embedded == 0  # a fresh index (restart) uses the on-disk cache
+
+
+def test_job_worktree_shares_the_vault_cache(vault: Vault, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    SearchIndex(vault, FakeEmbedder()).search("tomatoes")  # the server's index fills the vault's cache
+    tree = tmp_path / "tree"
+    shutil.copytree(vault.root, tree)
+    (tree / "wiki/kitchen/sourdough.md").unlink()  # a forge merged this page away
+
+    monkeypatch.setenv(SHARED_EMBEDDINGS_ENV, str(vault.cache_dir))
+    in_job = FakeEmbedder()
+    SearchIndex(Vault.open(tree), in_job).search("tomatoes")
+    assert in_job.embedded == 0  # nothing re-embedded for the worktree
+
+    monkeypatch.delenv(SHARED_EMBEDDINGS_ENV)
+    server = FakeEmbedder()
+    SearchIndex(vault, server).search("tomatoes")
+    assert server.embedded == 0  # the job didn't drop vectors the vault still needs
 
 
 def test_deleted_pages_drop_out(vault: Vault) -> None:

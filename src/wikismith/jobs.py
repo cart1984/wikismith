@@ -46,6 +46,7 @@ from wikismith.instructions import job_prompt
 from wikismith.logfile import logged_in
 from wikismith.merges import REVIEW_HEADING, CheckIssues, review, review_section
 from wikismith.questions import QuestionQueue, parse_questions, summary_counts
+from wikismith.search import SHARED_EMBEDDINGS_ENV
 from wikismith.secretscan import Scanner
 from wikismith.vault import Vault
 
@@ -302,6 +303,8 @@ class JobRunner:
         command = list(jobs.agent)
         # `wikismith check` and `scan` in the worktree, not in the vault the server was started with.
         env = with_wikismith_on_path({**os.environ, "WIKISMITH_VAULT": str(tree)})
+        # `wikismith search` in the worktree reuses the vault's embeddings instead of re-embedding everything.
+        env[SHARED_EMBEDDINGS_ENV] = str(self.vault.cache_dir)
         if not self.git.has_identity():  # e.g. in a container without the owner's ~/.gitconfig
             env.setdefault("GIT_AUTHOR_NAME", FALLBACK_NAME)
             env.setdefault("GIT_AUTHOR_EMAIL", FALLBACK_EMAIL)

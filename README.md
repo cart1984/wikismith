@@ -343,6 +343,10 @@ A branch that changes `raw/` is never merged. `review.auto_merge: none` makes ev
 
 **Questions don't block.** A file the forge can't decide (which area? bought or only considered?) stays unforged, with a question in your queue; the rest of the forge merges. `list_pending` shows open questions first, then waiting branches. Answer with `answer_questions`; your answers become one capture, and a new forge starts that uses them. A waiting branch is only ever merged (`merge_forge`) or discarded (`discard_forge`): for "almost, but…", discard it and capture the correction; the next forge redoes it.
 
+**Corrections wait for you.** When a capture says a fact is wrong or has changed, the forge rewrites the old line instead of adding a correction next to it, so the branch waits for your OK. That's on purpose: a rewrite is exactly the change you'd want to see.
+
+**Large imports.** A forge takes every unforged file at once, and the more it has to read, the more it tends to skim. For an import, add the files to `raw/` in batches and let each batch forge before adding the next: a handful of long files (a few hundred lines each) or about 1,500 lines per batch. `wikismith check --check unforged` shows each file's length. A forge that couldn't read a file completely leaves it unlogged and flags it, so the next forge tries again.
+
 **Notifications.** `jobs.notify` runs a command when something waits for you. It gets counts only (`forge: 2 questions, 1 branch waiting`), never content, so a public service like ntfy.sh never sees your notes:
 
 ```yaml

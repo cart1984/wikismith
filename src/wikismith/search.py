@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 import re
 import threading
+import zipfile
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
@@ -21,6 +23,10 @@ import numpy as np
 from wikismith.logfile import unforged_captures
 from wikismith.pages import Page, PageKind, load_page
 from wikismith.vault import Vault
+
+# Set for jobs: the vault's own cache folder. A job's worktree has a path of its own, so without this its searches
+# would re-embed the whole vault into a new cache folder that nothing cleans up.
+SHARED_EMBEDDINGS_ENV = "WIKISMITH_SHARED_EMBEDDINGS"
 
 SEMANTIC_WEIGHT = 0.7
 # Chunk size in the model's tokens, title and prefix included. Small enough for every model's limit (bge: 512),
@@ -278,7 +284,10 @@ class SearchIndex:
         self._chunks: list[Chunk] = []
         self._bm25 = BM25([])
         self._vectors: np.ndarray | None = None
-        self._cache = EmbeddingCache(vault.cache_dir, embedder.cache_id if embedder else "")
+        shared = os.environ.get(SHARED_EMBEDDINGS_ENV)
+        cache_id = embedder.cache_id if embedder else ""
+        # A shared cache only grows: what a job's worktree lacks may still be in the vault the server reads.
+        self._cache = EmbeddingCache(Path(shared) if shared else vault.cache_dir, cache_id, prune=not shared)
         self.count: Callable[[str], int] = embedder.count_tokens if embedder else estimate_tokens
         self._chunk_tokens: int | None = None
         self.status: Literal["building", "ready", "failed"] = "building"  # for /healthz
@@ -362,9 +371,10 @@ class SearchIndex:
 class EmbeddingCache:
     """Embeddings keyed by chunk content hash, persisted as one `.npz` per model."""
 
-    def __init__(self, cache_dir: Path, model: str) -> None:
+    def __init__(self, cache_dir: Path, model: str, prune: bool = True) -> None:
         slug = re.sub(r"[^A-Za-z0-9.-]+", "_", model)
         self.path = cache_dir / f"embeddings-{slug}.npz"
+        self.prune = prune  # drop vectors of chunks that no longer exist
         self._vectors: dict[str, np.ndarray] = {}
         self._loaded = False
 
@@ -375,7 +385,7 @@ class EmbeddingCache:
         try:
             with np.load(self.path) as data:
                 self._vectors = {k: data[k] for k in data.files}
-        except (OSError, ValueError):
+        except (OSError, ValueError, zipfile.BadZipFile):  # a damaged cache only costs re-embedding
             self._vectors = {}
 
     def vectors(self, chunks: list[Chunk], embedder: Embedder) -> np.ndarray:
@@ -387,7 +397,7 @@ class EmbeddingCache:
             for i, vec in zip(missing, new, strict=True):
                 self._vectors[keys[i]] = vec
         wanted = set(keys)
-        stale = [k for k in self._vectors if k not in wanted]
+        stale = [k for k in self._vectors if k not in wanted] if self.prune else []
         for k in stale:
             del self._vectors[k]
         if missing or stale:
@@ -399,7 +409,7 @@ class EmbeddingCache:
     def _save(self) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp.npz")
+            tmp = self.path.with_suffix(f".{os.getpid()}.tmp.npz")  # the server and a job may save at once
             np.savez(tmp, **self._vectors)  # pyright: ignore[reportArgumentType]
             tmp.replace(self.path)
         except OSError:

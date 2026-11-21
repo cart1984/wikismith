@@ -70,10 +70,19 @@ def test_index(vault: Vault) -> None:
 
 
 def test_unforged(vault: Vault) -> None:
-    assert [p for p, _ in issues(vault, "unforged")] == [
-        "raw/captures/2026-01-06_pepper-seeds.md",
-        "raw/notes/2026-01-05_router-setup.md",
+    assert issues(vault, "unforged") == [
+        ("raw/captures/2026-01-06_pepper-seeds.md", "not in the forge log yet (5 lines)"),
+        ("raw/notes/2026-01-05_router-setup.md", "not in the forge log yet (1 line)"),
     ]
+
+
+def test_unforged_reports_long_lines_and_binary_sizes(vault: Vault) -> None:
+    (vault.root / "raw/import").mkdir(parents=True)
+    (vault.root / "raw/import/digest.md").write_text("short\n" + "x" * 2500 + "\n")
+    (vault.root / "raw/import/scan.pdf").write_bytes(b"%PDF\xff\xfe" + bytes(3 * 1024))
+    found = dict(issues(vault, "unforged"))
+    assert found["raw/import/digest.md"] == "not in the forge log yet (2 lines, longest line 2500 characters)"
+    assert found["raw/import/scan.pdf"] == "not in the forge log yet (3 KB)"
 
 
 def test_secrets_in_wiki(vault: Vault) -> None:

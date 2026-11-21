@@ -25,7 +25,9 @@ raw/ ──forge──► wiki/<area>/ ──outdated──► archive/<area>/
 
 ## Pages
 
-- One topic per page. Prefer merging into an existing page over creating a near-duplicate.
+- **One page per topic.** Before creating a page, check the area's `_index.md` and search the wiki for a page on the same topic, and extend that page instead.
+- **No pages by source or batch.** Material from a new source (a mail or chat digest, notes, a capture, one batch of an import) goes into the existing topic pages, not into a page of its own. A separate page is only for a topic that has no page yet.
+- **Cross-cutting pages link, they don't copy.** A page that spans topics or projects (a timeline, a list of accomplishments, a decision log) holds one short line per entry with a `[[wikilink]]` to the topic page where the detail lives. The detail stays on the topic page, so a correction there is the only one needed.
 - Every page starts with frontmatter:
   ```yaml
   ---
@@ -50,7 +52,8 @@ mcpedia merges moves without review only when it can verify them, so keep moves 
 
 ## Facts
 
-- When sources disagree, keep both claims, note the conflict, and prefer the more recent one.
+- **Correct facts in place.** When a fact changes or turns out to be wrong, rewrite or remove the old line where it stands; never leave the wrong fact on the page with a separate correction line next to it. A rewrite waits for the owner's review, and that is intended.
+- When sources disagree and neither says which is right, keep both claims, note the conflict, and prefer the more recent one.
 - Don't upgrade intentions to facts: research or a plan to buy is "considered", not "bought", unless a source says it happened. Ask the owner when unsure.
 
 ## Secrets and personal data

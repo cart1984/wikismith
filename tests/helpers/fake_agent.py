@@ -13,6 +13,7 @@ mode = "audit" if prompt.startswith("# Audit the vault") else sys.argv[1]
 branch = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, check=True).stdout.strip()
 here = Path.cwd()
 assert os.environ["WIKISMITH_VAULT"] == str(here)  # `wikismith check` must look at the worktree
+assert here not in Path(os.environ["WIKISMITH_SHARED_EMBEDDINGS"]).parents  # search uses the vault's cache
 
 
 def git(*args: str) -> None:

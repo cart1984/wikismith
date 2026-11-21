@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal, get_args
 
 from wikismith.gitops import Git, GitError
@@ -18,6 +18,8 @@ from wikismith.vault import Vault
 CheckName = Literal["links", "orphans", "frontmatter", "index", "unforged", "secrets", "large"]
 CHECKS: tuple[CheckName, ...] = get_args(CheckName)
 REQUIRED_KEYS = ("title", "area", "tags", "updated", "sources")
+LONG_LINE = 2000  # characters; agents' file readers may cut lines longer than this
+MAX_TEXT_BYTES = 10 * 1024 * 1024  # larger raw files are reported by size only
 
 
 @dataclass(frozen=True)
@@ -122,7 +124,11 @@ class Checker:
         return issues
 
     def unforged(self, catalog: Catalog) -> list[Issue]:
-        return [Issue(self.vault.rel(p), "not in the forge log yet") for p in unforged_raw_files(self.vault)]
+        """Raw files not forged yet, with their size, so a forge can plan to read long ones in chunks."""
+        return [
+            Issue(self.vault.rel(p), f"not in the forge log yet ({_size_note(p)})")
+            for p in unforged_raw_files(self.vault)
+        ]
 
     def secrets(self, catalog: Catalog) -> list[Issue]:
         """Secrets in the wiki and archive (values are never shown)."""
@@ -177,6 +183,29 @@ def format_report(results: dict[CheckName, list[Issue]], limit: int = 50) -> str
         if len(issues) > limit:
             lines.append(f"- ... and {len(issues) - limit} more")
     return "\n".join(lines)
+
+
+def _size_note(path: Path) -> str:
+    """The size of a raw file: "312 lines" for text (plus its longest line when that is long), "48 KB" otherwise."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return "unreadable"
+    kb = f"{max(1, size // 1024)} KB"
+    if size > MAX_TEXT_BYTES:  # a video or archive needn't be read to say how big it is
+        return kb
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except OSError:
+        return "unreadable"
+    except UnicodeDecodeError:
+        return kb
+    lines = text.splitlines()
+    note = f"{len(lines)} line{'' if len(lines) == 1 else 's'}"
+    longest = max((len(line) for line in lines), default=0)
+    if longest > LONG_LINE:
+        note += f", longest line {longest} characters"
+    return note
 
 
 def _key(target: str) -> str:

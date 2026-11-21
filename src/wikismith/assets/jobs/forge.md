@@ -8,21 +8,22 @@ Don't pull, switch branches, merge or push: mcpedia does all of that.
 
 ## 1. Find what's new
 
-Run `wikismith check --check unforged` to list raw files not yet in `wiki/_log.md`. If there are none, report "Nothing to forge" and stop.
+Run `wikismith check --check unforged` to list raw files not yet in `wiki/_log.md`, with their length. If there are none, report "Nothing to forge" and stop.
 
 ## 2. Forge
 
-Work through the unforged files. Read related files together (several captures about one topic), and read the existing wiki pages they touch before changing them. A capture titled "Answers to forge questions" holds the owner's answers to earlier questions: forge it together with the files it names (its frontmatter lists them under `files`), and treat the answers as the owner's word.
+Work through the unforged files. Read every file completely before writing about it: long files in chunks, and files with very long lines (the check lists them) with a command that prints them whole, such as `fold -w 500 <file>`, since a file viewer may cut such lines short. Don't skim or summarize from the first part. If a file or part of one can't be read in full, leave the file unlogged and name it under "Flagged" with what was missed. Read related files together (several captures about one topic), and read the existing wiki pages they touch before changing them. A capture titled "Answers to forge questions" holds the owner's answers to earlier questions: forge it together with the files it names (its frontmatter lists them under `files`), and treat the answers as the owner's word.
 
 For each file:
 - Decide its area(s). If nothing fits, or you can't tell which of several areas it belongs to, don't guess and don't create an area: leave the file unlogged and add a question that proposes one (an existing area, or a new one with its name and one-line description). Create a new area only if a capture approves it (`approves_areas` in its frontmatter): its folder, an `_index.md` with `description:`, and its pages. If the vault has no areas yet, propose a whole set as one question.
-- Merge its facts into existing pages where they belong; create a page only for a genuinely new topic. Keep one topic per page. When you merge, split or archive pages, move the text verbatim (see "Moving text" in the general rules).
+- Merge its facts into existing pages where they belong; create a page only for a genuinely new topic. Before creating one, look for a page on the same topic, which earlier forges may have created: read the area's `_index.md`, grep `wiki/` for the topic's key terms (names, products, projects), and run `wikismith search "<what the topic is about>"` to find pages that use other words for it. Never create a page for a source or a batch (a digest, an import folder); its facts go into the topic pages. Keep one topic per page; on cross-cutting pages (timelines, decision logs), link to the topic page instead of copying its detail. When you merge, split or archive pages, move the text verbatim (see "Moving text" in the general rules).
 - Cite every fact you add or change: `(source: <raw path>)`, and add the path to the page's `sources`.
-- To add to what a page says, add new lines; don't edit existing ones, so mcpedia can verify the change as additive. An `_index.md` entry may be extended at its end. A correction of an existing line is a change for the owner to review.
+- To add to what a page says, add new lines; don't edit existing ones, so mcpedia can verify the change as additive. An `_index.md` entry may be extended at its end.
+- To correct what a page says, change the line where it stands: when a source says an existing fact is wrong or has changed, rewrite or remove the old line and cite the new source. Never leave the wrong fact in place with a separate "Correction" or "Update" line next to it. A rewrite waits for the owner's review, and that is intended: list it under "Changed".
 - Images and documents (PDFs) are sources like any other: cite them by path, and write down as facts what they show. Embed an image on a page with `![[<file name>]]`; never copy, convert or add binary files yourself.
 - Set `updated` to today on every page you change. Keep the frontmatter complete.
 - New or renamed pages go into the area's `_index.md`.
-- When the new material contradicts the wiki, keep both claims, note the conflict, prefer the newer one, and list it under "Flagged".
+- When the new material contradicts the wiki and doesn't say which is right (two sources disagree, neither corrects the other), keep both claims, note the conflict, prefer the newer one, and list it under "Flagged".
 - Don't upgrade intentions to facts ("considered" stays "considered"). If unsure, ask (as a question in the summary).
 - Secrets and other people's personal details: follow the policies in this vault's settings. Under any policy but `allow`, keep them out of the wiki, and list the raw file and the kind of data (never the value) under "Flagged".
 - Add one line to `wiki/_log.md`: `- <raw path> — <today> — <area>[, <area>]`, or `none` if nothing was worth keeping.
