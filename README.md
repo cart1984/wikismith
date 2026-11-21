@@ -120,7 +120,7 @@ my-vault/
 └── CLAUDE.md         your own rules for this vault
 ```
 
-- **Areas** are the folders in `wiki/`. Each has an `_index.md` whose frontmatter has a one-line `description:`; agents see it as the area's summary. A forge never creates an area by itself: it proposes one as a question, and you approve it.
+- **Areas** are the folders in `wiki/`. Each has an `_index.md` whose frontmatter has a one-line `description:`; agents see it as the area's summary. A forge never creates an area by itself: it proposes one as a question, and you approve it. If you already know the areas you want (say, a planned structure before a large import), approve them up front with `wikismith area add <name> "<description>" …`; the next forge creates them.
 - **Pages** have frontmatter (`title`, `area`, `tags`, `updated`, `sources`), cite every fact as `(source: raw/...)`, and link each other with `[[wikilinks]]`.
 - **`raw/` is never edited** after it's committed, by anyone. The layout below `raw/` is up to you.
 - **`CLAUDE.md`** holds your own rules (what goes in which area, how careful to be with purchases, …). Agents get it through `vault_guide`, forge jobs in full. It wins over the general rules.
@@ -501,6 +501,7 @@ Each model gets the query and passage prefixes it expects. Changing the model re
 | `wikismith run forge\|audit` | Run a job in the foreground, e.g. from cron |
 | `wikismith check` | The mechanical checks: `links`, `orphans`, `frontmatter`, `index`, `names` (a page name used twice), `unforged`, `secrets`, `large`. `--check similar` (only when asked for) lists pairs of pages that share much of their text, possible duplicates. `--check <name>`, `--limit`; exit 1 on issues |
 | `wikismith import <files> --to <folder>` | Copy files or folders into `raw/<folder>` word for word, check them like the hook does, and commit them |
+| `wikismith area add <name> <description> …` | Approve new areas without waiting for a forge to propose them; the next forge creates them |
 | `wikismith search <query>` | Search from the terminal. `--top-k`, `--area` |
 | `wikismith hook` | Enable the pre-commit hook for this vault; `--remove` disables it |
 | `wikismith pre-commit` | What the hook runs: large files, then the secret scan |

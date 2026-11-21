@@ -119,3 +119,14 @@ def test_import(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
     assert "Committed 1 file as " in capsys.readouterr().out
     assert main(args) == 1  # a second time: the file is in raw/ already
     assert "never overwritten" in capsys.readouterr().err
+
+
+def test_area_add(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["area", "add", "--vault", str(repo), "pets", "The cat", "trips"]) == 2  # no description for trips
+    assert "a name and a description" in capsys.readouterr().err
+    assert main(["area", "add", "--vault", str(repo), "pets", "The cat", "trips", "Holidays"]) == 0
+    assert "Captured to raw/captures/" in capsys.readouterr().out
+    assert main(["area", "add", "--vault", str(repo), "pets", "Again"]) == 1  # approved, not created yet
+    assert "approved already" in capsys.readouterr().err
+    assert main(["area", "add", "--vault", str(repo), "garden", "Vegetables"]) == 1
+    assert "exists already" in capsys.readouterr().err

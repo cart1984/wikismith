@@ -90,6 +90,30 @@ def cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_area_add(args: argparse.Namespace) -> int:
+    """Approve new areas: a capture with `approves_areas`, committed; the next forge creates them."""
+    from wikismith.areas import InvalidArea, approve_areas
+    from wikismith.captures import InvalidCapture
+    from wikismith.gitops import GitError
+
+    pairs = args.areas
+    if len(pairs) % 2:
+        print("wikismith area add: give each area a name and a description: <name> <description> ...", file=sys.stderr)
+        return 2
+    areas = dict(zip(pairs[::2], pairs[1::2], strict=True))
+    if len(areas) * 2 != len(pairs):
+        print("wikismith area add: an area is named twice", file=sys.stderr)
+        return 2
+    try:
+        result = approve_areas(_vault(args), areas)
+    except (InvalidArea, InvalidCapture, GitError) as e:
+        print(f"wikismith area add: {e}", file=sys.stderr)
+        return 1
+    print(result.summary())
+    print("The next forge creates the area folders (or start one now: `wikismith run forge`, or run_forge in mcpedia).")
+    return 0
+
+
 def cmd_shrink(args: argparse.Namespace) -> int:
     """Shrink images in place, keeping the originals in the vault's cache folder for 30 days."""
     from wikismith.media import MediaError, shrink
@@ -237,6 +261,17 @@ def build_parser() -> argparse.ArgumentParser:
     imp.add_argument("--to", required=True, help="folder inside raw/, e.g. import/2026-11-work")
     imp.add_argument("files", nargs="+", help="files or folders (a folder is copied with its layout)")
     imp.set_defaults(func=cmd_import)
+
+    area = sub.add_parser("area", help="manage areas: `area add` approves new ones")
+    area_sub = area.add_subparsers(dest="area_command", metavar="<command>", required=True)
+    area_add = area_sub.add_parser(
+        "add", help="approve new areas without waiting for a forge to propose them; the next forge creates them"
+    )
+    area_add.add_argument("--vault", help=vault_help)
+    area_add.add_argument(
+        "areas", nargs="+", metavar="<name> <description>", help='e.g. home-network "Router, Wi-Fi and the NAS"'
+    )
+    area_add.set_defaults(func=cmd_area_add)
 
     shrink = sub.add_parser("shrink", help="shrink images to the vault's limits (originals kept for 30 days)")
     shrink.add_argument("--vault", help=vault_help)
