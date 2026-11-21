@@ -10,7 +10,15 @@ import pytest
 from conftest import make_vault, write_files
 from wikismith.pages import Catalog, Page
 from wikismith.reader import Reader
-from wikismith.search import BM25, SHARED_EMBEDDINGS_ENV, SearchIndex, chunk_page, tokenize
+from wikismith.search import (
+    BM25,
+    SHARED_EMBEDDINGS_ENV,
+    EmbedderError,
+    SearchIndex,
+    chunk_page,
+    fetch_per_file,
+    tokenize,
+)
 from wikismith.vault import Vault
 
 SYNONYMS = {"irrigation": "watering", "hydrate": "watering", "loaf": "bread"}
@@ -286,3 +294,25 @@ def test_a_vault_with_a_single_page_finds_it(tmp_path: Path) -> None:
     assert paths(SearchIndex(vault, None), "saved here") == ["raw/captures/2026-02-01_test.md"]
     assert paths(SearchIndex(vault, FakeEmbedder()), "saved here") == ["raw/captures/2026-02-01_test.md"]
     assert paths(SearchIndex(vault, None), "nothing like it") == []  # no keyword match: still nothing
+
+
+def test_fetch_per_file_downloads_each_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import huggingface_hub
+
+    calls: list[tuple[str, str, str | None]] = []
+
+    def fake_download(repo: str, name: str, *, cache_dir: str, endpoint: str | None) -> str:
+        calls.append((repo, name, endpoint))
+        if name == "tokenizer.json" and endpoint == "http://broken":
+            raise RuntimeError("404 Not Found\nmore detail")
+        return str(tmp_path / name)
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
+    files = fetch_per_file("BAAI/bge-small-en-v1.5", tmp_path, "http://mirror")
+    assert files[0] == "model_optimized.onnx" and "tokenizer.json" in files
+    assert {(repo, endpoint) for repo, _, endpoint in calls} == {("Qdrant/bge-small-en-v1.5-onnx-Q", "http://mirror")}
+
+    with pytest.raises(EmbedderError, match=r"onnx-Q/tokenizer.json: 404 Not Found$"):
+        fetch_per_file("BAAI/bge-small-en-v1.5", tmp_path, "http://broken")  # a missing tokenizer is an error
+    with pytest.raises(EmbedderError, match="isn't a fastembed text model"):
+        fetch_per_file("no/such-model", tmp_path)

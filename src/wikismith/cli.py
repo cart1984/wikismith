@@ -209,6 +209,17 @@ def cmd_fetch_model(args: argparse.Namespace) -> int:
     from wikismith.search import FastEmbedder
     from wikismith.vault import model_dir
 
+    if args.per_file or args.endpoint:
+        os.environ["HF_HUB_DISABLE_XET"] = "1"  # plain file downloads: Xet storage needs a token from the API
+        from wikismith.search import EmbedderError, fetch_per_file
+
+        try:
+            files = fetch_per_file(args.model, model_dir(None), args.endpoint)
+        except EmbedderError as e:
+            print(f"wikismith fetch-model: {e}", file=sys.stderr)
+            return 1
+        print(f"downloaded {', '.join(files)}")
+        os.environ["HF_HUB_OFFLINE"] = "1"  # load what's in the cache now, without asking the hub again
     embedder = FastEmbedder(args.model, model_dir(None))
     dims = embedder.embed_passages(["warm up"]).shape[1]
     print(f"{args.model} ready ({dims} dimensions) in {model_dir(None)}")
@@ -314,6 +325,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     fetch = sub.add_parser("fetch-model", help="download the embedding model ahead of time")
     fetch.add_argument("--model", default=Search().model)
+    fetch.add_argument(
+        "--per-file",
+        action="store_true",
+        help="download file by file, for mirrors without the listing API (default endpoint: $HF_ENDPOINT)",
+    )
+    fetch.add_argument(
+        "--endpoint", help="a Hugging Face mirror, e.g. https://artifacts.example.com/huggingface (implies --per-file)"
+    )
     fetch.set_defaults(func=cmd_fetch_model)
     return parser
 

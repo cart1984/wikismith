@@ -490,6 +490,32 @@ Each model gets the query and passage prefixes it expects. Changing the model re
 - **The cache volume** holds each vault's embeddings and jobs; the model lives in the image (`/models`), so a rebuild with another model takes effect even with an old volume.
 - **Updating:** pull the new wikismith, then `docker compose build && docker compose up -d`.
 
+### Restricted networks
+
+The build downloads two things besides the Python and Debian packages: the embedding model (from Hugging Face) and the Claude Code CLI (from its release server). Behind a strict corporate proxy, either can fail. Proxy settings (`HTTPS_PROXY` and friends) are passed to the build as usual; for what the proxy blocks, there are three ways around it.
+
+**A Hugging Face mirror.** If your company mirrors Hugging Face (for example in a repository manager), build with `--build-arg WIKISMITH_HF_MIRROR=<the mirror's URL>`. The model is then fetched file by file, which also works with mirrors that serve files but not Hugging Face's listing API. Outside Docker it's `wikismith fetch-model --endpoint <URL>`.
+
+**A model you fetched elsewhere.** Run `wikismith fetch-model` on any machine that can reach Hugging Face (or the mirror); it fills `~/.cache/wikismith/models`. Copy that folder to the build machine and pass it as a build context: the build finds the model there and downloads nothing.
+
+**A Claude Code binary you fetched elsewhere.** Put the Linux `claude` binary for the image's architecture (x64 or arm64) in a folder of its own and pass that folder as a build context. Set `CLAUDE_CODE_SHA256` to its checksum to have the build check it; a downloaded binary is always checked against the release manifest.
+
+With Compose, name the folders in your `compose.override.yaml`:
+
+```yaml
+services:
+  mcpedia:
+    build:
+      additional_contexts:
+        models: /path/to/models            # the copied ~/.cache/wikismith/models
+        claude-binary: /path/to/claude-dir # holds the `claude` binary
+      args:
+        CLAUDE_CODE_SHA256: <sha256 of the binary>
+        # WIKISMITH_HF_MIRROR: https://hf-mirror.example.com
+```
+
+Without Compose: `docker build --build-context models=/path/to/models --build-context claude-binary=/path/to/claude-dir .`
+
 ## Reference
 
 ### Commands
@@ -507,7 +533,7 @@ Each model gets the query and passage prefixes it expects. Changing the model re
 | `wikismith pre-commit` | What the hook runs: large files, then the secret scan |
 | `wikismith scan [files]` | Scan files for secrets; `--staged` scans what's staged |
 | `wikismith shrink <images>` | Shrink images to the vault's limits; originals kept for 30 days |
-| `wikismith fetch-model` | Download an embedding model ahead of time. `--model` |
+| `wikismith fetch-model` | Download an embedding model ahead of time. `--model`; `--per-file` or `--endpoint <mirror>` for Hugging Face mirrors without the listing API |
 
 Every command that works on a vault takes `--vault <folder>`; the default is `$WIKISMITH_VAULT`, else the current folder.
 

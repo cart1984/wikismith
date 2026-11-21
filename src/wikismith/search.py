@@ -87,6 +87,32 @@ class Embedder(Protocol):
     def count_tokens(self, text: str) -> int: ...
 
 
+# The tokenizer and config files fastembed loads for a text model, besides the model's own files.
+_TOKENIZER_FILES = ("config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json")
+
+
+def fetch_per_file(model: str, models: Path, endpoint: str | None = None) -> list[str]:
+    """Download a model into the cache one file at a time, for Hugging Face mirrors that serve files (`/resolve/`) but
+    not the API that fastembed's own download needs. fastembed then finds the files in the cache. Returns the files.
+
+    Set HF_HUB_DISABLE_XET=1 before huggingface_hub is imported (the CLI does): Xet storage needs a token from the API.
+    """
+    from fastembed import TextEmbedding
+    from huggingface_hub import hf_hub_download
+
+    found = [m for m in TextEmbedding._list_supported_models() if m.model.lower() == model.lower()]
+    repo = found[0].sources.hf if found else None
+    if not repo:
+        raise EmbedderError(f"{model!r} isn't a fastembed text model with a Hugging Face source")
+    files = [found[0].model_file, *found[0].additional_files, *_TOKENIZER_FILES]
+    for name in files:
+        try:
+            hf_hub_download(repo, name, cache_dir=str(models), endpoint=endpoint)
+        except Exception as e:
+            raise EmbedderError(f"{repo}/{name}: {str(e).splitlines()[0]}") from e
+    return files
+
+
 class FastEmbedder:
     """Local ONNX embeddings via fastembed. The model loads on first use."""
 
