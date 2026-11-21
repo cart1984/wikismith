@@ -110,3 +110,12 @@ def test_port_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     assert build_parser().parse_args(["serve"]).port == 9123
     monkeypatch.delenv("WIKISMITH_PORT")
     assert build_parser().parse_args(["serve"]).port == 8765
+
+
+def test_import(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "review.md").write_text("# Review\n\nShipped it.\n")
+    args = ["import", "--vault", str(repo), "--to", "import/x", str(tmp_path / "review.md")]
+    assert main(args) == 0
+    assert "Committed 1 file as " in capsys.readouterr().out
+    assert main(args) == 1  # a second time: the file is in raw/ already
+    assert "never overwritten" in capsys.readouterr().err

@@ -345,7 +345,9 @@ A branch that changes `raw/` is never merged. `review.auto_merge: none` makes ev
 
 **Corrections wait for you.** When a capture says a fact is wrong or has changed, the forge rewrites the old line instead of adding a correction next to it, so the branch waits for your OK. That's on purpose: a rewrite is exactly the change you'd want to see.
 
-**Large imports.** A forge takes every unforged file at once, and the more it has to read, the more it tends to skim. For an import, add the files to `raw/` in batches and let each batch forge before adding the next: a handful of long files (a few hundred lines each) or about 1,500 lines per batch. `wikismith check --check unforged` shows each file's length. A forge that couldn't read a file completely leaves it unlogged and flags it, so the next forge tries again.
+**Large imports.** A forge takes every unforged file at once, and the more it has to read, the more it tends to skim. For an import, add the files to `raw/` in batches with `wikismith import` and let each batch forge before adding the next: a handful of long files (a few hundred lines each) or about 1,500 lines per batch. `wikismith check --check unforged` shows each file's length. A forge that couldn't read a file completely leaves it unlogged and flags it, so the next forge tries again.
+
+**Importing files word for word.** Captures are short notes that pass through an agent. For long material that must go in unchanged (a document, prepared digests, a submitted review), run `wikismith import <files or folders> --to import/<folder>` yourself: it copies them into `raw/import/<folder>/`, runs the same checks as the pre-commit hook (large files, then secrets), and commits them as one commit. It never overwrites a file in `raw/`, and if a check stops it, the copies are removed again. With the vault in Docker, run it on the machine that holds the vault folder, while no forge is running.
 
 **Notifications.** `jobs.notify` runs a command when something waits for you. It gets counts only (`forge: 2 questions, 1 branch waiting`), never content, so a public service like ntfy.sh never sees your notes:
 
@@ -498,6 +500,7 @@ Each model gets the query and passage prefixes it expects. Changing the model re
 | `wikismith serve` | Run mcpedia. `--transport stdio` (default) or `http`, `--host`, `--port`, `--no-auth` (loopback only) |
 | `wikismith run forge\|audit` | Run a job in the foreground, e.g. from cron |
 | `wikismith check` | The mechanical checks: `links`, `orphans`, `frontmatter`, `index`, `names` (a page name used twice), `unforged`, `secrets`, `large`. `--check similar` (only when asked for) lists pairs of pages that share much of their text, possible duplicates. `--check <name>`, `--limit`; exit 1 on issues |
+| `wikismith import <files> --to <folder>` | Copy files or folders into `raw/<folder>` word for word, check them like the hook does, and commit them |
 | `wikismith search <query>` | Search from the terminal. `--top-k`, `--area` |
 | `wikismith hook` | Enable the pre-commit hook for this vault; `--remove` disables it |
 | `wikismith pre-commit` | What the hook runs: large files, then the secret scan |

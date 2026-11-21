@@ -66,6 +66,30 @@ def cmd_precommit(args: argparse.Namespace) -> int:
     return run(Path(args.vault or Path.cwd()), tty_ask())
 
 
+def cmd_import(args: argparse.Namespace) -> int:
+    """Copy files into raw/ word for word, run the hook's checks and commit them as one commit."""
+    from wikismith.gitops import GitError
+    from wikismith.importer import ImportRefused, import_files
+    from wikismith.precommit import tty_ask
+
+    vault = _vault(args)
+    try:
+        result = import_files(vault, [Path(f) for f in args.files], args.to, tty_ask())
+    except (ImportRefused, GitError) as e:
+        print(f"wikismith import: {e}", file=sys.stderr)
+        return 1
+    n = len(result.files)
+    print(f"Committed {n} file{'' if n == 1 else 's'} as {result.commit}{', pushed' if result.pushed else ''}:")
+    for name in result.files:
+        print(f"  {name}")
+    for name in result.left_out:
+        print(f"  left out (removed again): {name}")
+    for warning in result.warnings:
+        print(warning, file=sys.stderr)
+    print("The next forge picks them up (or start one now: `wikismith run forge`, or run_forge in mcpedia).")
+    return 0
+
+
 def cmd_shrink(args: argparse.Namespace) -> int:
     """Shrink images in place, keeping the originals in the vault's cache folder for 30 days."""
     from wikismith.media import MediaError, shrink
@@ -205,6 +229,14 @@ def build_parser() -> argparse.ArgumentParser:
     pre = sub.add_parser("pre-commit", help="what the git hook runs: large files, then the secret scan")
     pre.add_argument("--vault", help="repository folder (default: the current folder)")
     pre.set_defaults(func=cmd_precommit)
+
+    imp = sub.add_parser(
+        "import", help="copy files into raw/ word for word and commit them (secret and large-file checks first)"
+    )
+    imp.add_argument("--vault", help=vault_help)
+    imp.add_argument("--to", required=True, help="folder inside raw/, e.g. import/2026-11-work")
+    imp.add_argument("files", nargs="+", help="files or folders (a folder is copied with its layout)")
+    imp.set_defaults(func=cmd_import)
 
     shrink = sub.add_parser("shrink", help="shrink images to the vault's limits (originals kept for 30 days)")
     shrink.add_argument("--vault", help=vault_help)
