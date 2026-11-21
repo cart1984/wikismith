@@ -1,6 +1,6 @@
 [project]
 name = "wikismith"
-version = "0.1.0"
+version = "0.2.0"
 description = "Forge a wiki from raw notes, and serve it to AI agents over MCP (mcpedia)."
 readme = "README.md"
 authors = [{ name = "cart1984" }]
