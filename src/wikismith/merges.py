@@ -8,7 +8,11 @@ branch merges by itself only if every change is one of these:
 - **a verified move**: lines removed from one place appear unchanged in the branch (page merges and splits, reordered
   sections); index entries of pages moved out of the wiki may go;
 - **an unchanged archive move**: a page renamed from `wiki/` to `archive/` with identical content;
-- **a mechanical fix**: a line whose only change is a link, if the branch leaves fewer check issues than it found.
+- **a mechanical fix**: a line whose only change is a link, if the branch leaves fewer check issues than it found;
+- **a volatile line** (with `review.auto_merge: volatile`, the default): a line that was provisional before the branch
+  changed it: in a section whose heading carries one of `review.volatile_tags` (`## Plan #plan`, with its
+  subsections), or carrying such a tag itself. Open questions, plans and status are expected to be replaced by
+  newer information. At most `review.volatile_max_lines` per branch; adding a tag to an existing line still waits.
 
 Everything else waits: rewritten or removed text, changed frontmatter values, deletions whose text appears nowhere,
 new areas without the owner's approval, binary files, flagged pages, `wikismith.yaml`, anything outside the job's
@@ -25,6 +29,7 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from wikismith.config import CONFIG_FILE, JobKind
+from wikismith.config import Review as ReviewSettings
 from wikismith.gitops import Git, GitError
 from wikismith.markdown import parse_frontmatter
 from wikismith.secretscan import Scanner
@@ -32,6 +37,8 @@ from wikismith.vault import Vault
 
 CheckIssues = frozenset[tuple[str, str]]  # (path, message) from `wikismith check`
 LINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]")
+HEADING = re.compile(r"^(#{1,6})\s")
+FENCE = re.compile(r"^\s*(```|~~~)")
 EXAMPLES = 3  # unverified lines shown per file
 DIFF_LINES_PER_FILE = 60  # diff lines shown per file that needs the owner's OK ...
 DIFF_LINES_TOTAL = 200  # ... and in all
@@ -110,7 +117,7 @@ def review(
         return out
 
     _check_areas(vault, git, base, content, out)
-    _check_lines(content, out, before, after)
+    _check_lines(content, out, before, after, config.review)
     _check_secrets(vault, content, out)
     if before is not None and after is not None and (new := sorted(after - before)):
         shown = "; ".join(f"{path}: {message}" for path, message in new[:EXAMPLES])
@@ -228,7 +235,15 @@ def approved_areas(vault: Vault) -> set[str]:
     return names
 
 
-def _check_lines(changes: list[_Change], out: Review, before: CheckIssues | None, after: CheckIssues | None) -> None:
+def _check_lines(
+    changes: list[_Change],
+    out: Review,
+    before: CheckIssues | None,
+    after: CheckIssues | None,
+    settings: ReviewSettings | None = None,
+) -> None:
+    tag = _tag_pattern(settings.volatile_tags) if settings and settings.auto_merge == "volatile" else None
+    volatile: list[tuple[str, str, str | None]] = []  # (path, old line, the line that replaced it, if one did)
     # Everything the branch's changed files say afterwards: where removed lines must reappear.
     corpus = {_norm(line) for c in changes if c.new for line in _body(c.new).splitlines()}
     # Pages that left the wiki (deleted, or moved to the archive): their index entries may go.
@@ -241,11 +256,13 @@ def _check_lines(changes: list[_Change], out: Review, before: CheckIssues | None
             continue
         for problem in _frontmatter_problems(c.old, c.new):
             out.wait(f"{c.path}: {problem}", c.path, "frontmatter changed")
-        removed, added = _diff(_body(c.old or ""), _body(c.new or ""))
+        old_body = _body(c.old or "")
+        removed, added = _diff_pairs(old_body, _body(c.new or ""))
         added_variants = {v for line in added for v in _variants(line)}
         is_index = PurePosixPath(c.path).name == "_index.md"
+        provisional = _volatile_lines(old_body, tag) if tag is not None and c.old is not None else set()
         unverified, link_lines = [], 0
-        for line in removed:
+        for index, line, replaced_by in removed:
             if _trivial(line):
                 continue
             if _norm(line) in corpus:
@@ -256,6 +273,8 @@ def _check_lines(changes: list[_Change], out: Review, before: CheckIssues | None
                 moved += 1  # the index entry of a page moved out of the wiki
             elif is_index and any(_extends(new, line) for new in added):
                 extended += 1
+            elif index in provisional:
+                volatile.append((c.path, line.strip(), replaced_by))
             else:
                 unverified.append(line.strip())
         if unverified:
@@ -265,6 +284,8 @@ def _check_lines(changes: list[_Change], out: Review, before: CheckIssues | None
         if link_lines:
             links += link_lines
             link_paths.append(c.path)
+    if volatile and settings is not None:
+        _report_volatile(volatile, settings.volatile_max_lines, out)
     if moved:
         out.verified.append(f"{moved} line(s) moved unchanged")
     if extended:
@@ -279,6 +300,25 @@ def _check_lines(changes: list[_Change], out: Review, before: CheckIssues | None
                 out.block(path, "links changed")
         else:
             out.verified.append(f"{links} link fix(es), check issues down from {len(before)} to {len(after)}")
+
+
+def _report_volatile(volatile: list[tuple[str, str, str | None]], limit: int, out: Review) -> None:
+    """Volatile lines merge by themselves, up to `limit` per branch, and the owner sees each one: old -> new."""
+    paths = list(dict.fromkeys(path for path, _, _ in volatile))
+    if len(volatile) > limit:
+        out.waits.append(
+            f"{len(volatile)} volatile line(s) rewritten or removed, more than review.volatile_max_lines ({limit})"
+        )
+        for path in paths:
+            out.block(path, "many volatile lines changed")
+        return
+    for path in paths:
+        lines = [(old, new) for p, old, new in volatile if p == path]
+        shown = "; ".join(
+            f"{old[:80]!r} -> {new.strip()[:80]!r}" if new and new.strip() else f"{old[:80]!r} (removed)"
+            for old, new in lines
+        )
+        out.verified.append(f"{path}: {len(lines)} volatile line(s) updated: {shown}")
 
 
 def _check_secrets(vault: Vault, changes: list[_Change], out: Review) -> None:
@@ -336,6 +376,59 @@ def _diff(old: str, new: str) -> tuple[list[str], list[str]]:
         if tag in ("insert", "replace"):
             added += b[j1:j2]
     return removed, added
+
+
+def _diff_pairs(old: str, new: str) -> tuple[list[tuple[int, str, str | None]], list[str]]:
+    """Like `_diff`, but each removed line comes with its index in `old` and, where a block of lines was replaced by
+    one of the same length, the line that took its place."""
+    a, b = old.splitlines(), new.splitlines()
+    removed: list[tuple[int, str, str | None]] = []
+    added: list[str] = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if tag in ("delete", "replace"):
+            same_size = tag == "replace" and i2 - i1 == j2 - j1
+            removed += [(i, a[i], b[j1 + i - i1] if same_size else None) for i in range(i1, i2)]
+        if tag in ("insert", "replace"):
+            added += b[j1:j2]
+    return removed, added
+
+
+def _tag_pattern(tags: tuple[str, ...]) -> re.Pattern[str] | None:
+    """An Obsidian tag from `tags` (`#plan`, or nested `#plan/2027`), not part of a word, link or heading anchor."""
+    if not tags:
+        return None
+    names = "|".join(re.escape(t) for t in tags)
+    return re.compile(rf"(?<![\w#/\[&])#(?:{names})(?:/[\w/-]*)?(?![\w-])")
+
+
+def _volatile_lines(body: str, tag: re.Pattern[str] | None) -> set[int]:
+    """Indexes of the provisional lines in `body`: every line of a section whose heading carries a volatile tag
+    (up to the next heading of the same or a higher level, subsections included), and lines carrying one themselves.
+    Headings and tags inside code blocks don't count."""
+    if tag is None:
+        return set()
+    found: set[int] = set()
+    sections: list[tuple[int, bool]] = []  # open headings: (level, volatile)
+    in_code = False
+    for i, line in enumerate(body.splitlines()):
+        inside = bool(sections) and sections[-1][1]
+        if FENCE.match(line):
+            in_code = not in_code
+            if inside:
+                found.add(i)
+            continue
+        heading = None if in_code else HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            while sections and sections[-1][0] >= level:
+                sections.pop()
+            covered = any(v for _, v in sections) or bool(tag.search(line))
+            sections.append((level, covered))
+            if covered:
+                found.add(i)
+        elif inside or (not in_code and tag.search(line)):
+            found.add(i)
+    return found
 
 
 def _norm(line: str) -> str:

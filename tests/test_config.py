@@ -13,6 +13,8 @@ def test_minimal_config_gets_defaults() -> None:
     assert config.secrets.mask_reads is True
     assert (config.git.sync, config.git.commit_captures) == (True, True)
     assert config.jobs.agent[:2] == ("claude", "-p")
+    assert config.review.auto_merge == "volatile"
+    assert (config.review.volatile_tags, config.review.volatile_max_lines) == (("open", "plan", "status"), 10)
 
 
 def test_full_config() -> None:
@@ -50,6 +52,11 @@ def test_full_config() -> None:
         ({"name": "x", "layout": {"captures": "inbox"}}, "inside layout.raw"),
         ({"name": "x", "secrets": {"patterns": [{"id": "bad", "regex": "("}]}}, "invalid regex"),
         ({"name": "x", "jobs": {"timeout_minutes": 0}}, "must be positive"),
+        ({"name": "x", "review": {"auto_merge": "all"}}, "must be one of: none, additive, volatile"),
+        ({"name": "x", "review": {"volatile_tags": ["#plan"]}}, "is not a tag (write it without '#'"),
+        ({"name": "x", "review": {"volatile_tags": ["two words"]}}, "is not a tag"),
+        ({"name": "x", "review": {"volatile_max_lines": -1}}, "must not be negative"),
+        ({"name": "x", "review": {"volatile_max_lines": "10"}}, "wrong type"),
         ({"name": "x", "extra": 1}, "unknown key(s): extra"),
     ],
 )

@@ -53,6 +53,8 @@ mcpedia merges moves without review only when it can verify them, so keep moves 
 ## Facts
 
 - **Correct facts in place.** When a fact changes or turns out to be wrong, rewrite or remove the old line where it stands; never leave the wrong fact on the page with a separate correction line next to it. A rewrite waits for the owner's review, and that is intended.
+- **Provisional text is tagged.** Open questions, plans, tentative dates and the status of ongoing work go in a section whose heading carries a volatile tag (by default `#open`, `#plan`, `#status`, e.g. `## Next steps #plan`); the tag covers the section with its subsections. A single provisional line among facts gets the tag at its end (`- Which hose to buy? #open`). Such text is expected to change: update it in place when newer information arrives.
+- **Facts never go in a tagged section.** When a question is decided or a plan is done, write the result as a fact in a normal section and remove or update the tagged line. Tag only what is really provisional, never to avoid a review.
 - When sources disagree and neither says which is right, keep both claims, note the conflict, and prefer the more recent one.
 - Don't upgrade intentions to facts: research or a plan to buy is "considered", not "bought", unless a source says it happened. Ask the owner when unsure.
 

@@ -331,6 +331,7 @@ Both run as jobs: a headless agent (Claude Code by default) in a git worktree ou
 | Merges by itself | Waits for you |
 |---|---|
 | New pages and lines; frontmatter that only grows | Rewritten or removed lines, listed with examples |
+| Provisional lines rewritten or removed: in a section tagged `#open`, `#plan` or `#status`, or tagged themselves (up to 10 per forge) | Tags added to existing headings or lines |
 | Index entries extended at the end | Changed frontmatter values |
 | Lines moved unchanged (pages merged or split) | Deleted pages whose text appears nowhere else |
 | Pages moved to the archive unchanged | New areas you haven't approved |
@@ -338,6 +339,8 @@ Both run as jobs: a headless agent (Claude Code by default) in a git worktree ou
 | | New check issues; secrets or personal data in what it adds |
 
 A branch that changes `raw/` is never merged. `review.auto_merge: none` makes every forge wait. Audits only add a report, so they merge by themselves.
+
+**Provisional text.** Open questions, plans and the status of ongoing work are meant to be replaced when new information arrives, unlike facts. Mark them with a tag: on a heading it covers the whole section with its subsections (`## Next steps #plan`), on a line just that line (`- Which hose to buy? #open`). With `review.auto_merge: volatile`, the default, a forge may rewrite or remove such lines without your OK; what counts is whether the line was tagged before the forge, so tagging an existing heading or line still waits for you. The forge's summary lists every one, old and new. More than `review.volatile_max_lines` (10) in one forge, and it waits. The tags are `review.volatile_tags` (`open`, `plan`, `status`); in a vault without them nothing changes. `review.auto_merge: additive` is the earlier behavior: every rewritten line waits.
 
 **What you see for a waiting branch.** `job_status` and `list_pending` show its summary and, under "Changes that need your OK", the diff of each file that keeps it from merging, with the reason (for example `wiki/garden/my-garden.md (flagged for review)`). The other changed files are listed by name. That's enough to decide in any client, a phone included; a long diff is cut, and the report names the `git diff` command for the rest.
 
@@ -558,7 +561,7 @@ Prompts: `forge`, `audit` and `capture`. Claude Code shows them as `/mcp__<name>
 
 ### Settings
 
-`wikismith init` writes `wikismith.yaml` with every setting, commented, at its default; uncomment what you change. mcpedia never changes it. The sections: `name`, `description`, `timezone`, `layout` (folder names), `files` (large files), `access` (what agents may read), `secrets`, `git`, `search`, `review` (`auto_merge`, `flag`), `jobs` (`agent`, `timeout_minutes`, `notify`). Unknown keys and wrong types are errors, so a typo never goes unnoticed.
+`wikismith init` writes `wikismith.yaml` with every setting, commented, at its default; uncomment what you change. mcpedia never changes it. The sections: `name`, `description`, `timezone`, `layout` (folder names), `files` (large files), `access` (what agents may read), `secrets`, `git`, `search`, `review` (`auto_merge`, `flag`, `volatile_tags`, `volatile_max_lines`), `jobs` (`agent`, `timeout_minutes`, `notify`). Unknown keys and wrong types are errors, so a typo never goes unnoticed.
 
 ## Development
 

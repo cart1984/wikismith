@@ -26,6 +26,12 @@ def job_prompt(vault: Vault, kind: JobKind) -> str:
     review = vault.config.review
     files = vault.config.files
     settings = _policies(vault) + f"- Auto-merge: `{review.auto_merge}`.\n"
+    if review.auto_merge == "volatile" and review.volatile_tags:
+        tags = ", ".join(f"`#{t}`" for t in review.volatile_tags)
+        settings += (
+            f"- Volatile tags: {tags}. Up to {review.volatile_max_lines} lines in tagged sections or lines may be "
+            "rewritten or removed without review.\n"
+        )
     settings += (
         f"- File limits: images {files.image_max_px} px and {files.image_max_kb} KB, other files {files.max_kb} KB.\n"
     )

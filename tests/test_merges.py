@@ -263,3 +263,100 @@ def test_every_file_is_shown_when_no_single_one_blocks(repo: Path) -> None:
     text = review_section(vault, name, {}, "not marked ready to merge")
     assert "wiki/garden/tomatoes.md (not marked ready to merge):" in text and "+Mulch in June." in text
     assert "Other changed files" not in text
+
+
+# -- volatile lines (review.auto_merge: volatile, the default) ------------------------------------------------------
+
+TOMATOES = "wiki/garden/tomatoes.md"
+PROVISIONAL = (
+    "\n## Plan #plan\n\nBuy seeds in March.\n\n### Later\n\nTry a greenhouse.\n\n"
+    "## Harvest\n\nPick when red.\n\n- Which hose to buy? #open\n- Hose length is 30 m.\n"
+    "\n```\n## Not a heading #plan\n```\n\nShade cloth from [[my-garden#open]].\n"
+)
+
+
+def on_main(repo: Path, text: str = PROVISIONAL) -> None:
+    append(repo, TOMATOES, text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "provisional lines")
+
+
+def test_lines_in_a_tagged_section_merge_and_are_shown(repo: Path) -> None:
+    on_main(repo)
+
+    def edit(r: Path) -> None:
+        replace(r, TOMATOES, "Buy seeds in March.", "Seeds bought on March 3.")
+        replace(r, TOMATOES, "Try a greenhouse.\n", "")
+
+    result = verdict(repo, edit)
+    assert result.mergeable, result.waits
+    assert result.verified == [
+        f"{TOMATOES}: 2 volatile line(s) updated: 'Buy seeds in March.' -> 'Seeds bought on March 3.'; "
+        "'Try a greenhouse.' (removed)"
+    ]
+
+
+def test_a_tagged_line_in_a_fact_section_merges(repo: Path) -> None:
+    on_main(repo)
+    result = verdict(repo, lambda r: replace(r, TOMATOES, "- Which hose to buy? #open", "- Bought the Gilmour hose."))
+    assert result.mergeable, result.waits
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("Pick when red.", "Pick when deep red."),  # a fact after the tagged section ended
+        ("- Hose length is 30 m.", "- Hose length is 25 m."),  # a fact next to a tagged line
+        ("## Watering", "## Watering #plan"),  # tagging an existing heading is the owner's call
+        ("Shade cloth from [[my-garden#open]].", "Shade cloth from the shed."),  # a heading anchor isn't a tag
+    ],
+)
+def test_fact_lines_still_wait(repo: Path, old: str, new: str) -> None:
+    on_main(repo)
+    result = verdict(repo, lambda r: replace(r, TOMATOES, old, new))
+    assert not result.mergeable and "1 line(s) removed or rewritten" in result.waits[0]
+
+
+def test_headings_and_tags_in_code_blocks_dont_count(repo: Path) -> None:
+    on_main(repo, "\n## Notes\n\n```\n## Plan #plan\n```\n\nWater at dawn.\n")
+    result = verdict(repo, lambda r: replace(r, TOMATOES, "Water at dawn.", "Water at dusk."))
+    assert not result.mergeable
+
+
+def test_removing_a_tag_and_nested_tags(repo: Path) -> None:
+    on_main(repo, "\n## Plan #plan/2027\n\nBuild raised beds.\n")
+
+    def edit(r: Path) -> None:
+        replace(r, TOMATOES, "## Plan #plan/2027", "## Raised beds")
+        replace(r, TOMATOES, "Build raised beds.", "Raised beds built in April.")
+
+    result = verdict(repo, edit)
+    assert result.mergeable, result.waits
+
+
+def test_too_many_volatile_lines_wait(repo: Path) -> None:
+    on_main(repo)
+
+    def edit(r: Path) -> None:
+        replace(r, TOMATOES, "Buy seeds in March.", "Seeds bought.")
+        replace(r, TOMATOES, "Try a greenhouse.", "No greenhouse.")
+
+    result = verdict(repo, edit, review={"volatile_max_lines": 1})
+    assert result.waits == ["2 volatile line(s) rewritten or removed, more than review.volatile_max_lines (1)"]
+    assert result.blocking == {TOMATOES: "many volatile lines changed"}
+
+
+def test_additive_mode_ignores_tags(repo: Path) -> None:
+    on_main(repo)
+    result = verdict(
+        repo, lambda r: replace(r, TOMATOES, "Buy seeds in March.", "Seeds bought."), review={"auto_merge": "additive"}
+    )
+    assert not result.mergeable
+
+
+def test_own_tags(repo: Path) -> None:
+    on_main(repo, "\n## Ideas #draft\n\nMaybe peppers.\n")
+    result = verdict(
+        repo, lambda r: replace(r, TOMATOES, "Maybe peppers.", "Peppers planted."), review={"volatile_tags": ["draft"]}
+    )
+    assert result.mergeable, result.waits

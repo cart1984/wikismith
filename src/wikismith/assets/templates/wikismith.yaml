@@ -39,8 +39,11 @@ name: {name}
 #   model: BAAI/bge-small-en-v1.5
 
 # review:
-#   auto_merge: additive    # none | additive: merge forges that only add things
+#   auto_merge: volatile    # none | additive: merge forges that only add things | volatile: also let them update
+#                           # provisional lines (sections or lines tagged with volatile_tags)
 #   flag: ["wiki/*/my-*.md"] # pages that always wait for the owner's OK
+#   volatile_tags: [open, plan, status]  # a heading with one covers its section; a line with one, just that line
+#   volatile_max_lines: 10  # more volatile lines rewritten or removed in one forge: it waits
 
 # jobs:                    # how mcpedia runs forge and audit jobs: any headless agent CLI, Claude Code by default
 #   agent: [claude, -p, --permission-mode, acceptEdits, --allowedTools, "Bash(git *),Bash(wikismith *),Read,Write,Edit,Glob,Grep"]

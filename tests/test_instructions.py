@@ -125,8 +125,15 @@ def test_job_prompt_has_the_vaults_settings(vault_root: Path) -> None:
     vault = make_vault(vault_root, secrets={"policy": "allow", "pii": "warn"}, review={"flag": ["wiki/*/my-*.md"]})
     prompt = job_prompt(vault, "forge")
     settings = prompt[prompt.index("## This vault's settings") : prompt.index("## General vault rules")]
-    assert "- Secret policy: `allow`.\n- PII policy: `warn`.\n- Auto-merge: `additive`.\n" in settings
+    assert "- Secret policy: `allow`.\n- PII policy: `warn`.\n- Auto-merge: `volatile`.\n" in settings
+    assert "- Volatile tags: `#open`, `#plan`, `#status`. Up to 10 lines in tagged sections" in settings
     assert "- Pages flagged for review: `wiki/*/my-*.md`." in settings
+
+
+def test_job_prompt_without_volatile_mode(vault_root: Path) -> None:
+    vault = make_vault(vault_root, review={"auto_merge": "additive"})
+    prompt = job_prompt(vault, "forge")
+    assert "- Auto-merge: `additive`.\n" in prompt and "Volatile tags" not in prompt
 
 
 def test_instructions_name_both_policies(vault_root: Path) -> None:

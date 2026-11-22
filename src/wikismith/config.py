@@ -19,7 +19,7 @@ from wikismith.markdown import yaml_error
 CONFIG_FILE = "wikismith.yaml"
 
 Policy = Literal["allow", "warn", "redact", "block"]  # for secrets and for personal data
-AutoMerge = Literal["none", "additive"]
+AutoMerge = Literal["none", "additive", "volatile"]
 ImageMode = Literal["shrink", "ask"]
 JobKind = Literal["forge", "audit"]
 
@@ -93,8 +93,12 @@ class Search:
 
 @dataclass(frozen=True)
 class Review:
-    auto_merge: AutoMerge = "additive"
+    auto_merge: AutoMerge = "volatile"
     flag: tuple[str, ...] = ()
+    # Tags that mark provisional text (open questions, plans, status): a heading with one covers its section, a line
+    # with one covers that line. With auto_merge `volatile`, such lines may be rewritten or removed without review.
+    volatile_tags: tuple[str, ...] = ("open", "plan", "status")
+    volatile_max_lines: int = 10  # more volatile lines rewritten or removed in one branch: it waits
 
 
 # Headless Claude Code, allowed to edit files and run only git and wikismith commands. mcpedia passes the job's
@@ -234,6 +238,11 @@ def _validate(config: VaultConfig) -> None:
                 f"access.read: {folder!r} is not allowed; agents may read only the wiki and archive "
                 "folders (unforged captures are covered by access.search_captures)"
             )
+    if config.review.volatile_max_lines < 0:
+        raise ConfigError("review.volatile_max_lines must not be negative")
+    for tag in config.review.volatile_tags:
+        if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_/-]*", tag):
+            raise ConfigError(f"review.volatile_tags: {tag!r} is not a tag (write it without '#', e.g. open)")
     if config.jobs.timeout_minutes <= 0:
         raise ConfigError("jobs.timeout_minutes must be positive")
     if not config.jobs.agent:
