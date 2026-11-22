@@ -64,7 +64,9 @@ class Checker:
         names = _link_keys(catalog.pages)
         archived = _link_keys([p for p in catalog.pages if p.kind == "archive"])
         wiki_names = _link_keys([p for p in catalog.pages if p.kind == "wiki"])
-        files = {p.name for d in (self.vault.wiki_dir, self.vault.archive_dir) if d.is_dir() for p in d.rglob("*")}
+        # Images and other files stay in raw/ and are embedded from there, so raw/ counts as well.
+        dirs = (self.vault.wiki_dir, self.vault.archive_dir, self.vault.raw_dir)
+        files = {p.name for d in dirs if d.is_dir() for p in d.rglob("*") if p.is_file()}
         issues = []
         for page in self._content_pages(catalog):
             for link in page.doc.links:

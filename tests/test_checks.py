@@ -37,6 +37,21 @@ def test_links_resolve_paths_aliases_and_files(vault: Vault) -> None:
     assert [m for p, m in issues(vault, "links") if p == "wiki/garden/photos.md"] == ["[[missing.png]]: file not found"]
 
 
+def test_links_resolve_files_in_raw(vault: Vault) -> None:
+    write_files(
+        vault.root,
+        {
+            "wiki/garden/photos.md": (
+                "---\ntitle: Photos\narea: garden\ntags: []\nupdated: 2026-01-02\nsources: []\n---\n"
+                "![[plug.jpg]] ![[raw/captures/tester.jpg]] ![[gone.jpg]]\n"
+            ),
+            "raw/captures/plug.jpg": "",
+            "raw/captures/tester.jpg": "",
+        },
+    )
+    assert [m for p, m in issues(vault, "links") if p == "wiki/garden/photos.md"] == ["[[gone.jpg]]: file not found"]
+
+
 def test_orphans(vault: Vault) -> None:
     assert issues(vault, "orphans") == [("wiki/kitchen/knife-care.md", "no page links here")]
 
