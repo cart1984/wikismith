@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]  # every branch: a commit must pass CI before it can go onto main
   pull_request:
 
 permissions:
@@ -50,3 +50,15 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The one check the ruleset on main requires: green only if every job above passed. List each new job in `needs`.
+  # It always runs, because a skipped required check would count as passed.
+  ci-ok:
+    if: always()
+    needs: [test, docker, secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All jobs passed
+        run: |
+          echo '${{ toJSON(needs) }}'
+          test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false"
